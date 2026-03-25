@@ -1,14 +1,6 @@
 #!/usr/bin/env bash
-# llm-run v5.6 (OPERATOR-SAFE, LIVE STREAM, DRY-RUN SIMULATION, COPY-READY OUTPUT)
-#
-# SAFE BY DEFAULT:
-# - DRY RUN (EXEC=0)
-# - fully isolated sandbox
-# - cannot kill parent shell
-# - live streaming of model + command output
-# - repair loop fully visible
-# - controlled failure handling
-# - final command ready for copy/paste, optional clipboard
+# llm-run v6.0 (FULL FIX: CLEAN CACHE + STRIP ALL SPINNERS, ANSI, CONTROL CHARS)
+# SAFE: DRY-RUN, SANDBOX, COPY-TO-CLIPBOARD, REPAIR LOOP
 
 set -euo pipefail
 trap 'printf "[ERROR] Contained failure (no shell exit)\n" >&2' ERR
@@ -31,15 +23,8 @@ TASK="${1:-}"
 touch "$CACHE" "$LOG"
 
 # -----------------------------
-# Logging
-# -----------------------------
-log() {
-    printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" | tee -a "$LOG"
-}
+log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" | tee -a "$LOG"; }
 
-# -----------------------------
-# Task hints
-# -----------------------------
 task_hint() {
     case "$1" in
         "list files sorted by newest") printf "Use: ls -t\n" ;;
@@ -50,15 +35,21 @@ task_hint() {
     esac
 }
 
-# -----------------------------
-# Cache
-# -----------------------------
-cache_get() { grep -F "$TASK|" "$CACHE" | tail -n1 | cut -d'|' -f2- || true; }
-cache_put() { printf "%s|%s\n" "$TASK" "$1" >> "$CACHE"; }
+normalize_command() {
+    # Strip all leading/trailing whitespace, residual COMMAND:, ANSI, control chars
+    local cmd="$1"
+    echo "$cmd" \
+        | tr -d '\000' \
+        | sed 's/```//g' \
+        | sed -r 's/\x1B\[[0-9;?]*[a-zA-Z]//g' \
+        | tr -cd '\11\12\15\40-\176' \
+        | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+        | sed -e 's/^COMMAND:[[:space:]]*//'
+}
 
-# -----------------------------
-# Prompt / Model
-# -----------------------------
+cache_get() { grep -F "$TASK|" "$CACHE" | tail -n1 | cut -d'|' -f2- || true; }
+cache_put() { printf "%s|%s\n" "$TASK" "$(normalize_command "$1")" >> "$CACHE"; }
+
 build_prompt() {
     cat <<EOF
 Return ONLY:
@@ -77,22 +68,11 @@ Task: $TASK
 EOF
 }
 
-extract_command() {
-    awk '/^COMMAND:/ {sub(/^COMMAND:[[:space:]]+/, "", $0); print; exit} NF {print; exit}'
-}
+extract_command() { awk '/^COMMAND:/ {sub(/^COMMAND:[[:space:]]+/, "", $0); print; exit} NF {print; exit}'; }
 
-call_model() {
-    set +e
-    build_prompt | timeout "$TIMEOUT" ollama run "$1" 2>&1 | tee -a "$LOG"
-}
+call_model() { set +e; build_prompt | timeout "$TIMEOUT" ollama run "$1" 2>&1 | tee -a "$LOG"; }
 
-get_command() {
-    local raw clean cmd
-    raw=$(call_model "$1")
-    clean=$(echo "$raw" | tr -d '\000' | sed 's/```//g')
-    cmd=$(echo "$clean" | extract_command)
-    printf '%s\n' "$cmd"
-}
+get_command() { normalize_command "$(call_model "$1" | extract_command)"; }
 
 validate_command() {
     local cmd="$1"
@@ -106,11 +86,9 @@ validate_command() {
     esac
 }
 
-# -----------------------------
-# Sandbox Execution
-# -----------------------------
 sandbox_exec() {
-    local cmd="$1"
+    local cmd
+    cmd=$(normalize_command "$1")
     if echo "$cmd" | grep -Eq '(rm -rf /|mkfs|dd if=|:(){|shutdown|reboot|poweroff|kill -9 1)'; then
         echo "BLOCKED"
         return 1
@@ -160,11 +138,10 @@ copy_to_clipboard() {
 }
 
 # -----------------------------
-# Main Flow
-# -----------------------------
 log "TASK: $TASK"
 
 CMD=$(cache_get)
+CMD=$(normalize_command "$CMD")
 if [[ -n "$CMD" ]]; then
     log "CACHE HIT: $CMD"
     copy_to_clipboard "$CMD"
@@ -179,7 +156,6 @@ if [[ -n "$CMD" ]]; then
     fi
 fi
 
-# Model generation
 CMD=$(get_command "$PRIMARY_MODEL")
 validate_command "$CMD" || CMD=$(get_command "$FALLBACK_MODEL")
 log "MODEL CMD: $CMD"
@@ -189,7 +165,6 @@ copy_to_clipboard "$CMD"
 
 OUTPUT=$(sandbox_exec "$CMD" || true)
 
-# Repair loop
 if ! validate_execution "$OUTPUT"; then
     for i in $(seq 1 $REPAIR_ATTEMPTS); do
         log "REPAIR ATTEMPT: $i"
@@ -199,7 +174,6 @@ if ! validate_execution "$OUTPUT"; then
     done
 fi
 
-# Final
 if validate_execution "$OUTPUT"; then
     cache_put "$CMD"
     printf '%s\n' "$CMD"
