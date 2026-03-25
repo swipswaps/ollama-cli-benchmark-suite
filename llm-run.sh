@@ -1,22 +1,17 @@
 #!/usr/bin/env bash
-# llm-run v5.5 (OPERATOR-SAFE, LIVE STREAM, DRY-RUN SIMULATION, COPY-READY OUTPUT)
+# llm-run v5.6 (OPERATOR-SAFE, LIVE STREAM, DRY-RUN SIMULATION, COPY-READY OUTPUT)
 #
 # SAFE BY DEFAULT:
-# - DRY RUN (simulated execution if EXEC=0)
-# - sandbox fully isolated
+# - DRY RUN (EXEC=0)
+# - fully isolated sandbox
 # - cannot kill parent shell
 # - live streaming of model + command output
 # - repair loop fully visible
 # - controlled failure handling
-# - final command ready for copy/paste, optionally copied to clipboard
-#
-# USAGE:
-#   ./llm-run.sh "show disk usage"
-#   EXEC=1 ./llm-run.sh "show disk usage"   # allow execution
-#   COPY=1 ./llm-run.sh "show disk usage"   # copy command to clipboard (xclip)
+# - final command ready for copy/paste, optional clipboard
 
-set -uo pipefail
-trap 'echo "[ERROR] contained failure (no shell exit)" >&2' ERR
+set -euo pipefail
+trap 'printf "[ERROR] Contained failure (no shell exit)\n" >&2' ERR
 
 PRIMARY_MODEL="qwen2:1.5b"
 FALLBACK_MODEL="qwen2:0.5b"
@@ -29,54 +24,44 @@ COPY="${COPY:-0}"
 
 CACHE="./.llm_cmd_cache.db"
 LOG="./.llm_cmd.log"
+TASK="${1:-}"
+
+[[ -n "$TASK" ]] || { printf "Usage: %s \"task\"\n" "$0"; exit 1; }
 
 touch "$CACHE" "$LOG"
 
-TASK="${1:-}"
-
-if [[ -z "$TASK" ]]; then
-    echo "Usage: $0 \"task\""
-    exit 1
-fi
+# -----------------------------
+# Logging
+# -----------------------------
+log() {
+    printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" | tee -a "$LOG"
+}
 
 # -----------------------------
-# TASK CONSTRAINTS
+# Task hints
 # -----------------------------
 task_hint() {
     case "$1" in
-        "list files sorted by newest") echo "Use: ls -t" ;;
-        "show current directory") echo "Use: pwd" ;;
-        "list running processes") echo "Use: ps aux" ;;
-        "show disk usage") echo "Use: df -h" ;;
-        *) echo "" ;;
+        "list files sorted by newest") printf "Use: ls -t\n" ;;
+        "show current directory") printf "Use: pwd\n" ;;
+        "list running processes") printf "Use: ps aux\n" ;;
+        "show disk usage") printf "Use: df -h\n" ;;
+        *) printf "" ;;
     esac
 }
 
 # -----------------------------
-# CACHE
+# Cache
 # -----------------------------
-cache_get() {
-    grep -F "$TASK|" "$CACHE" | tail -n1 | cut -d'|' -f2- || true
-}
-
-cache_put() {
-    echo "$TASK|$1" >> "$CACHE"
-}
+cache_get() { grep -F "$TASK|" "$CACHE" | tail -n1 | cut -d'|' -f2- || true; }
+cache_put() { printf "%s|%s\n" "$TASK" "$1" >> "$CACHE"; }
 
 # -----------------------------
-# LOGGING
-# -----------------------------
-log() {
-    echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"
-}
-
-# -----------------------------
-# PROMPT / MODEL
+# Prompt / Model
 # -----------------------------
 build_prompt() {
     cat <<EOF
 Return ONLY:
-
 COMMAND: <single bash command>
 
 STRICT:
@@ -93,23 +78,12 @@ EOF
 }
 
 extract_command() {
-    awk '
-    /^COMMAND:/ {
-        sub(/^COMMAND:[[:space:]]+/, "", $0)
-        print
-        exit
-    }
-    NF {
-        print
-        exit
-    }'
+    awk '/^COMMAND:/ {sub(/^COMMAND:[[:space:]]+/, "", $0); print; exit} NF {print; exit}'
 }
 
 call_model() {
-    (
-        set +e
-        build_prompt | timeout "$TIMEOUT" ollama run "$1" 2>&1 | tee -a "$LOG"
-    )
+    set +e
+    build_prompt | timeout "$TIMEOUT" ollama run "$1" 2>&1 | tee -a "$LOG"
 }
 
 get_command() {
@@ -117,7 +91,7 @@ get_command() {
     raw=$(call_model "$1")
     clean=$(echo "$raw" | tr -d '\000' | sed 's/```//g')
     cmd=$(echo "$clean" | extract_command)
-    echo "$cmd"
+    printf '%s\n' "$cmd"
 }
 
 validate_command() {
@@ -133,7 +107,7 @@ validate_command() {
 }
 
 # -----------------------------
-# SANDBOX EXECUTION
+# Sandbox Execution
 # -----------------------------
 sandbox_exec() {
     local cmd="$1"
@@ -141,24 +115,22 @@ sandbox_exec() {
         echo "BLOCKED"
         return 1
     fi
-    (
-        set +e
-        if command -v bwrap >/dev/null 2>&1; then
-            timeout "$SANDBOX_TIMEOUT" bwrap \
-                --ro-bind /usr /usr \
-                --ro-bind /bin /bin \
-                --ro-bind /lib /lib \
-                --ro-bind /lib64 /lib64 \
-                --ro-bind /etc /etc \
-                --proc /proc \
-                --dev /dev \
-                --tmpfs /tmp \
-                --unshare-net \
-                /bin/sh -c "$cmd"
-        else
-            timeout "$SANDBOX_TIMEOUT" bash -c "$cmd"
-        fi
-    ) 2>&1 | tee -a "$LOG"
+
+    if command -v bwrap >/dev/null 2>&1; then
+        timeout "$SANDBOX_TIMEOUT" bwrap \
+            --ro-bind /usr /usr \
+            --ro-bind /bin /bin \
+            --ro-bind /lib /lib \
+            --ro-bind /lib64 /lib64 \
+            --ro-bind /etc /etc \
+            --proc /proc \
+            --dev /dev \
+            --tmpfs /tmp \
+            --unshare-net \
+            /bin/sh -c "$cmd"
+    else
+        timeout "$SANDBOX_TIMEOUT" bash -c "$cmd"
+    fi
 }
 
 validate_execution() {
@@ -172,97 +144,69 @@ validate_execution() {
     esac
 }
 
-# -----------------------------
-# SIMULATE OUTPUT FOR DRY-RUN
-# -----------------------------
 simulate_output() {
     case "$TASK" in
         "show disk usage") df -h | head -n5 ;;
         "list running processes") ps aux | head -n5 ;;
         "list files sorted by newest") ls -t | head -n5 ;;
         "show current directory") pwd ;;
-        *) echo "[SIMULATED OUTPUT]" ;;
+        *) printf "[SIMULATED OUTPUT]\n" ;;
     esac
 }
 
-# -----------------------------
-# COPY TO CLIPBOARD
-# -----------------------------
 copy_to_clipboard() {
-    local cmd="$1"
-    if [[ "$COPY" == "1" ]] && command -v xclip >/dev/null 2>&1; then
-        echo -n "$cmd" | xclip -sel clip
-        log "COPIED TO CLIPBOARD"
-    fi
+    [[ "$COPY" == "1" ]] && command -v xclip >/dev/null 2>&1 && \
+        printf '%s' "$1" | xclip -sel clip && log "COPIED TO CLIPBOARD"
 }
 
 # -----------------------------
-# MAIN FLOW
+# Main Flow
 # -----------------------------
 log "TASK: $TASK"
 
-# 1. CACHE FIRST
 CMD=$(cache_get)
 if [[ -n "$CMD" ]]; then
     log "CACHE HIT: $CMD"
     copy_to_clipboard "$CMD"
     if [[ "$EXEC" == "1" ]]; then
         OUTPUT=$(sandbox_exec "$CMD" || true)
-        if validate_execution "$OUTPUT"; then
-            echo "$CMD"
-            exit 0
-        fi
+        validate_execution "$OUTPUT" && { printf '%s\n' "$CMD"; exit 0; }
     else
-        echo "[DRY-RUN][CACHE] $CMD"
-        echo "[DRY-RUN SIMULATED OUTPUT]"
+        printf "[DRY-RUN][CACHE] %s\n" "$CMD"
         simulate_output
-        echo "Command ready for copy: $CMD"
+        printf "Command ready for copy: %s\n" "$CMD"
         exit 0
     fi
 fi
 
-# 2. MODEL GENERATION
+# Model generation
 CMD=$(get_command "$PRIMARY_MODEL")
-if ! validate_command "$CMD"; then
-    CMD=$(get_command "$FALLBACK_MODEL")
-fi
+validate_command "$CMD" || CMD=$(get_command "$FALLBACK_MODEL")
 log "MODEL CMD: $CMD"
 copy_to_clipboard "$CMD"
 
-# DRY RUN SIMULATION
-if [[ "$EXEC" != "1" ]]; then
-    echo "[DRY-RUN][MODEL] $CMD"
-    echo "[DRY-RUN SIMULATED OUTPUT]"
-    simulate_output
-    echo "Command ready for copy: $CMD"
-    exit 0
-fi
+[[ "$EXEC" == "1" ]] || { simulate_output; printf "Command ready for copy: %s\n" "$CMD"; exit 0; }
 
-# 3. EXECUTION
 OUTPUT=$(sandbox_exec "$CMD" || true)
 
-# 4. REPAIR LOOP
+# Repair loop
 if ! validate_execution "$OUTPUT"; then
-    for _ in $(seq 1 $REPAIR_ATTEMPTS); do
-        log "REPAIR ATTEMPT: $(_)"
+    for i in $(seq 1 $REPAIR_ATTEMPTS); do
+        log "REPAIR ATTEMPT: $i"
         CMD=$(get_command "$PRIMARY_MODEL")
         OUTPUT=$(sandbox_exec "$CMD" || true)
-        if validate_execution "$OUTPUT"; then
-            log "REPAIR SUCCESS: $CMD"
-            copy_to_clipboard "$CMD"
-            break
-        fi
+        validate_execution "$OUTPUT" && { log "REPAIR SUCCESS: $CMD"; copy_to_clipboard "$CMD"; break; }
     done
 fi
 
-# 5. FINAL
+# Final
 if validate_execution "$OUTPUT"; then
     cache_put "$CMD"
-    echo "$CMD"
+    printf '%s\n' "$CMD"
     log "SUCCESS: $CMD"
-    echo "Command ready for copy: $CMD"
+    printf "Command ready for copy: %s\n" "$CMD"
 else
-    echo "FAILED"
     log "FAIL"
+    printf "FAILED\n"
     exit 1
 fi
