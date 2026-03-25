@@ -1,0 +1,64 @@
+TASK: list files sorted by newest
+CMD: sort -n
+SOURCE: model
+VALID: no
+EXEC_OK: no
+OUTPUT:
+
+----------------------------------
+TASK: list files sorted by newest
+CMD: 
+SOURCE: model
+VALID: no
+EXEC_OK: no
+OUTPUT:
+
+----------------------------------
+TASK: show current directory
+CMD: 
+SOURCE: model
+VALID: no
+EXEC_OK: no
+OUTPUT:
+
+----------------------------------
+TASK: show current directory
+CMD: pwd()
+SOURCE: model
+VALID: no
+EXEC_OK: no
+OUTPUT:
+
+----------------------------------
+TASK: list running processes
+CMD: ps
+SOURCE: model
+VALID: yes
+EXEC_OK: no
+OUTPUT:
+bwrap: execvp /bin/sh: No such file or directory
+----------------------------------
+TASK: list running processes
+CMD: ps aux | grep "process_name"
+SOURCE: model
+VALID: yes
+EXEC_OK: no
+OUTPUT:
+bwrap: execvp /bin/sh: No such file or directory
+----------------------------------
+TASK: show disk usage
+CMD: df -h
+SOURCE: model
+VALID: yes
+EXEC_OK: yes
+OUTPUT:
+bwrap: execvp /bin/sh: No such file or directory
+----------------------------------
+TASK: show disk usage
+CMD: df -h
+SOURCE: cache
+VALID: yes
+EXEC_OK: yes
+OUTPUT:
+bwrap: execvp /bin/sh: No such file or directory
+----------------------------------

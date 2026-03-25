@@ -1,0 +1,9 @@
+model,task,iter,latency,valid,exec_ok,score,source,command
+"list files sorted by newest",1,23.9727,no,no,0,model,"sort -n"
+"list files sorted by newest",2,3.83906,no,no,0,model,""
+"show current directory",1,3.68975,no,no,0,model,""
+"show current directory",2,2.36601,no,no,0,model,"pwd()"
+"list running processes",1,13.8453,yes,no,1,model,"ps"
+"list running processes",2,19.8949,yes,no,1,model,"ps aux | grep "process_name""
+"show disk usage",1,16.2463,yes,yes,3,model,"df -h"
+"show disk usage",2,0.0194647,yes,yes,3,cache,"df -h"

@@ -1,0 +1,336 @@
+MODEL: qwen2:0.5b
+TASK: list files sorted by newest
+ITER: 1
+LATENCY: 1.62935
+VALID: no
+OUTPUT: ``` ls -tRf ``` 
+----------------------------------
+MODEL: qwen2:0.5b
+TASK: list files sorted by newest
+ITER: 2
+LATENCY: 7.18293
+VALID: no
+OUTPUT: ```bash ls -tGn ``` This will return a list of all files sorted alphabetically by their last extension (given by the `--type` option). The `-t` flag tells `ls` to sort first by size, then by modification time in descending order. If you're looking for files with certain extensions or file types, use the `--type` option. If your goal is to list all files but not their last extension or file type, you can remove the `--type` option from the format: 'ls -lGn'. 
+----------------------------------
+MODEL: qwen2:0.5b
+TASK: show current directory
+ITER: 1
+LATENCY: 0.918746
+VALID: yes
+OUTPUT: COMMAND: pwd 
+----------------------------------
+MODEL: qwen2:0.5b
+TASK: show current directory
+ITER: 2
+LATENCY: 0.773583
+VALID: yes
+OUTPUT: COMMAND: cd 
+----------------------------------
+MODEL: qwen2:0.5b
+TASK: list running processes
+ITER: 1
+LATENCY: 1.69848
+VALID: yes
+OUTPUT: COMMAND: sudo ps -ef | grep -v '^grep|awk|find|sort' 
+----------------------------------
+MODEL: qwen2:0.5b
+TASK: list running processes
+ITER: 2
+LATENCY: 1.30646
+VALID: no
+OUTPUT: `ps -eo %CPU,%MEM,%TB时间和进程ID` 
+----------------------------------
+MODEL: qwen2:0.5b
+TASK: show disk usage
+ITER: 1
+LATENCY: 1.69424
+VALID: no
+OUTPUT: ```bash du -h /proc/<process-id>/mem_free.txt ``` 
+----------------------------------
+MODEL: qwen2:0.5b
+TASK: show disk usage
+ITER: 2
+LATENCY: 2.71011
+VALID: no
+OUTPUT: ``` Total: 0% Free: 63% Used: 19% Available: 25% Peak Free: 7% Percent Used: 40% ``` 
+----------------------------------
+MODEL: phi3:mini
+TASK: list files sorted by newest
+ITER: 1
+LATENCY: 33.1291
+VALID: no
+OUTPUT:  
+----------------------------------
+MODEL: phi3:mini
+TASK: list files sorted by newest
+ITER: 2
+LATENCY: 30.1793
+VALID: no
+OUTPUT: find . -type f | sort -k +1.9 -gr | xargs ls -lh --time-style=+%Y-%m-%d %H:%M --date=@timestamp -tF In this command: - `find . -type f` finds all the files in current directory and its subdirectories, as requested. - This output is then piped into a 
+----------------------------------
+MODEL: phi3:mini
+TASK: show current directory
+ITER: 1
+LATENCY: 3.4172
+VALID: no
+OUTPUT: pwd 
+----------------------------------
+MODEL: phi3:mini
+TASK: show current directory
+ITER: 2
+LATENCY: 0.946918
+VALID: no
+OUTPUT: pwd 
+----------------------------------
+MODEL: phi3:mini
+TASK: list running processes
+ITER: 1
+LATENCY: 3.07037
+VALID: no
+OUTPUT: ps aux 
+----------------------------------
+MODEL: phi3:mini
+TASK: list running processes
+ITER: 2
+LATENCY: 1.17862
+VALID: no
+OUTPUT: ps aux 
+----------------------------------
+MODEL: phi3:mini
+TASK: show disk usage
+ITER: 1
+LATENCY: 3.64507
+VALID: no
+OUTPUT: du -sh / 
+----------------------------------
+MODEL: phi3:mini
+TASK: show disk usage
+ITER: 2
+LATENCY: 1.15883
+VALID: no
+OUTPUT: df -h 
+----------------------------------
+MODEL: gemma:2b
+TASK: list files sorted by newest
+ITER: 1
+LATENCY: 28.4133
+VALID: no
+OUTPUT: Sure, here is the command you requested: ```bash ls -t -a | sort -n ``` 
+----------------------------------
+MODEL: gemma:2b
+TASK: list files sorted by newest
+ITER: 2
+LATENCY: 10.5149
+VALID: no
+OUTPUT: Sure, here's the command you requested: ```bash ls -t -r ``` This command will list the files in the current directory sorted by their last modification date, with the most recently modified files appearing first. 
+----------------------------------
+MODEL: gemma:2b
+TASK: show current directory
+ITER: 1
+LATENCY: 8.21268
+VALID: no
+OUTPUT: Sure, here is the command you requested: ```bash pwd ``` This command will show you the current directory you are in. 
+----------------------------------
+MODEL: gemma:2b
+TASK: show current directory
+ITER: 2
+LATENCY: 8.98648
+VALID: no
+OUTPUT: Sure, here's the command you requested: ```bash pwd ``` This command will display the current working directory and return the path of the directory in the variable `$PWD`. 
+----------------------------------
+MODEL: gemma:2b
+TASK: list running processes
+ITER: 1
+LATENCY: 30.0099
+VALID: no
+OUTPUT: Sure, here is the command you requested: ```bash ps -eo pid,name,state,uid,tty | grep -v grep -i 'inactive\|stopped\|none\|LISTEN\|VIRT\|PID' ``` **Explanation:** * `ps`: This command is used to list running processes. * `-eo`: This option specifies the output format. * `pid,name,state,uid,tty`: These are the columns that are displayed in the output. * `grep -v grep -i 'inactive\|stopped\|none\|LISTEN\|VIRT\|PID'`: This filters the output to only 
+----------------------------------
+MODEL: gemma:2b
+TASK: list running processes
+ITER: 2
+LATENCY: 5.27505
+VALID: no
+OUTPUT: **COMMAND:** ps -aux | grep -v grep -o '[\w\d]+' ``` 
+----------------------------------
+MODEL: gemma:2b
+TASK: show disk usage
+ITER: 1
+LATENCY: 13.1437
+VALID: no
+OUTPUT: Sure, here is the command you requested: ```bash df -h ``` **Explanation:** * `df` is the `disk` command. * `-h` tells `df` to display disk usage in human format. 
+----------------------------------
+MODEL: gemma:2b
+TASK: show disk usage
+ITER: 2
+LATENCY: 12.7951
+VALID: no
+OUTPUT: Sure, here's the command you requested: ```bash df -h ``` **Explanation:** * `df` is the command used to display file system usage. * `-h` flag is used to show disk usage in human-readable format. 
+----------------------------------
+MODEL: llama3.2:3b
+TASK: list files sorted by newest
+ITER: 1
+LATENCY: 29.6398
+VALID: no
+OUTPUT: ls -ltr | awk '{print $9}' | sort -r 
+----------------------------------
+MODEL: llama3.2:3b
+TASK: list files sorted by newest
+ITER: 2
+LATENCY: 2.45679
+VALID: no
+OUTPUT: ls -lah | sort -r 
+----------------------------------
+MODEL: llama3.2:3b
+TASK: show current directory
+ITER: 1
+LATENCY: 2.24942
+VALID: no
+OUTPUT: cd 
+----------------------------------
+MODEL: llama3.2:3b
+TASK: show current directory
+ITER: 2
+LATENCY: 1.51354
+VALID: no
+OUTPUT: ls -l 
+----------------------------------
+MODEL: llama3.2:3b
+TASK: list running processes
+ITER: 1
+LATENCY: 5.61855
+VALID: no
+OUTPUT: ps -eo pid,ppid,cmd | grep -v 'grep' 
+----------------------------------
+MODEL: llama3.2:3b
+TASK: list running processes
+ITER: 2
+LATENCY: 3.19384
+VALID: no
+OUTPUT: ps -ef | grep 'RUNNING' 
+----------------------------------
+MODEL: llama3.2:3b
+TASK: show disk usage
+ITER: 1
+LATENCY: 3.24116
+VALID: yes
+OUTPUT: COMMAND: df -h 
+----------------------------------
+MODEL: llama3.2:3b
+TASK: show disk usage
+ITER: 2
+LATENCY: 2.99552
+VALID: no
+OUTPUT: ls -lh / | grep 'total' 
+----------------------------------
+MODEL: qwen2:1.5b
+TASK: list files sorted by newest
+ITER: 1
+LATENCY: 30.5605
+VALID: no
+OUTPUT:  
+----------------------------------
+MODEL: qwen2:1.5b
+TASK: list files sorted by newest
+ITER: 2
+LATENCY: 29.3655
+VALID: yes
+OUTPUT: COMMAND: ls -Srta 
+----------------------------------
+MODEL: qwen2:1.5b
+TASK: show current directory
+ITER: 1
+LATENCY: 1.74724
+VALID: yes
+OUTPUT: COMMAND: pwd 
+----------------------------------
+MODEL: qwen2:1.5b
+TASK: show current directory
+ITER: 2
+LATENCY: 1.03819
+VALID: yes
+OUTPUT: COMMAND: pwd 
+----------------------------------
+MODEL: qwen2:1.5b
+TASK: list running processes
+ITER: 1
+LATENCY: 2.67659
+VALID: yes
+OUTPUT: COMMAND: ps -aux | grep -v 'grep' 
+----------------------------------
+MODEL: qwen2:1.5b
+TASK: list running processes
+ITER: 2
+LATENCY: 1.94111
+VALID: yes
+OUTPUT: COMMAND: ps aux | grep -v 'grep' 
+----------------------------------
+MODEL: qwen2:1.5b
+TASK: show disk usage
+ITER: 1
+LATENCY: 2.72699
+VALID: yes
+OUTPUT: COMMAND: df -h | grep /path/to/disk 
+----------------------------------
+MODEL: qwen2:1.5b
+TASK: show disk usage
+ITER: 2
+LATENCY: 1.26359
+VALID: no
+OUTPUT: command: df -h 
+----------------------------------
+MODEL: mistral:7b
+TASK: list files sorted by newest
+ITER: 1
+LATENCY: 30.0093
+VALID: no
+OUTPUT:  
+----------------------------------
+MODEL: mistral:7b
+TASK: list files sorted by newest
+ITER: 2
+LATENCY: 30.0085
+VALID: no
+OUTPUT:  
+----------------------------------
+MODEL: mistral:7b
+TASK: show current directory
+ITER: 1
+LATENCY: 30.0093
+VALID: no
+OUTPUT:  
+----------------------------------
+MODEL: mistral:7b
+TASK: show current directory
+ITER: 2
+LATENCY: 30.0097
+VALID: no
+OUTPUT:  
+----------------------------------
+MODEL: mistral:7b
+TASK: list running processes
+ITER: 1
+LATENCY: 30.0093
+VALID: no
+OUTPUT:  
+----------------------------------
+MODEL: mistral:7b
+TASK: list running processes
+ITER: 2
+LATENCY: 30.0087
+VALID: no
+OUTPUT:  
+----------------------------------
+MODEL: mistral:7b
+TASK: show disk usage
+ITER: 1
+LATENCY: 30.0095
+VALID: no
+OUTPUT:  
+----------------------------------
+MODEL: mistral:7b
+TASK: show disk usage
+ITER: 2
+LATENCY: 30.0109
+VALID: no
+OUTPUT:  
+----------------------------------
