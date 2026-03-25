@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# llm-run v6.3 (Fully sanitized + safe flags + debug + enhanced caching + clipboard compatibility)
+# llm-run v6.4 (PRF-compliant, fully sanitized, debug, enhanced cache, sandbox, clipboard)
+# Author: PRF Audit Enabled
+# Purpose: Safely generate, validate, and optionally execute single-line bash commands via LLM
+# [PRF-P00] Initialization & Config
 
 set -euo pipefail
 
@@ -18,14 +21,17 @@ LOG="./.llm_cmd.log"
 TASK="${1:-}"
 
 [[ -n "$TASK" ]] || { echo "Usage: $0 \"task\""; exit 1; }
-
 touch "$CACHE" "$LOG"
 
+# -----------------------------
+# [PRF-P01] Logging Function
 log() { 
     local msg="$*"
     printf '[%s] %s\n' "$(date +%H:%M:%S)" "$msg" | tee -a "$LOG"
 }
 
+# -----------------------------
+# [PRF-P02] Provide Hint for LLM Task Constraints
 task_hint() {
     case "$1" in
         "list files sorted by newest") echo "Use: ls -t" ;;
@@ -36,6 +42,8 @@ task_hint() {
     esac
 }
 
+# -----------------------------
+# [PRF-P03] Normalize Command Output
 normalize_command() {
     local cmd="$1"
     printf '%s' "$cmd" \
@@ -46,9 +54,16 @@ normalize_command() {
         | sed -E 's/^COMMAND:[[:space:]]*//;s/^["`]//;s/["`]$//'
 }
 
-cache_get() { grep -F "|$TASK|" "$CACHE" | tail -n1 | cut -d'|' -f2- || true; }
+# -----------------------------
+# [PRF-P04] Cache Retrieval
+cache_get() { grep -F "|$TASK|" "$CACHE" | tail -n1 | cut -d'|' -f3- || true; }
+
+# -----------------------------
+# [PRF-P05] Cache Storage
 cache_put() { printf "%s|%s|%s\n" "$(date +%s)" "$TASK" "$(normalize_command "$1")" >> "$CACHE"; }
 
+# -----------------------------
+# [PRF-P06] Build LLM Prompt
 build_prompt() {
     cat <<EOF
 Return ONLY:
@@ -67,9 +82,16 @@ Task: $TASK
 EOF
 }
 
+# -----------------------------
+# [PRF-P07] Extract Command From LLM Output
 extract_command() { awk '/^COMMAND:/ {sub(/^COMMAND:[[:space:]]+/, "", $0); print; exit} NF {print; exit}'; }
+
+# -----------------------------
+# [PRF-P08] Call LLM Model
 call_model() { set +e; build_prompt | timeout "$TIMEOUT" ollama run "$1" 2>&1 | tee -a "$LOG"; }
 
+# -----------------------------
+# [PRF-P09] Get Normalized Command From Model
 get_command() {
     local raw
     raw=$(call_model "$1" | extract_command)
@@ -77,6 +99,8 @@ get_command() {
     normalize_command "$raw"
 }
 
+# -----------------------------
+# [PRF-P10] Validate Command Against Task
 validate_command() {
     local cmd="$1"
     [[ -z "$cmd" ]] && return 1
@@ -89,6 +113,8 @@ validate_command() {
     esac
 }
 
+# -----------------------------
+# [PRF-P11] Sandbox Execution
 sandbox_exec() {
     local cmd="$1"
     cmd=$(normalize_command "$cmd")
@@ -118,6 +144,8 @@ sandbox_exec() {
     return ${rc:-0}
 }
 
+# -----------------------------
+# [PRF-P12] Validate Execution Output
 validate_execution() {
     local output="$1"
     case "$TASK" in
@@ -129,6 +157,8 @@ validate_execution() {
     esac
 }
 
+# -----------------------------
+# [PRF-P13] Simulated Output For Dry-Run
 simulate_output() {
     log "[SIMULATED OUTPUT]"
     case "$TASK" in
@@ -140,6 +170,8 @@ simulate_output() {
     esac
 }
 
+# -----------------------------
+# [PRF-P14] Copy Command to Clipboard
 copy_to_clipboard() {
     [[ "$COPY" == "1" ]] && {
         if command -v xclip >/dev/null 2>&1; then
@@ -151,6 +183,7 @@ copy_to_clipboard() {
 }
 
 # -----------------------------
+# [PRF-P99] Main Execution Flow
 log "TASK: $TASK"
 
 CMD=$(normalize_command "$(cache_get)")
