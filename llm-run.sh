@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# llm-run v5.4 (OPERATOR-SAFE, LIVE STREAM, DRY-RUN SIMULATION)
+# llm-run v5.5 (OPERATOR-SAFE, LIVE STREAM, DRY-RUN SIMULATION, COPY-READY OUTPUT)
 #
 # SAFE BY DEFAULT:
 # - DRY RUN (simulated execution if EXEC=0)
@@ -8,10 +8,12 @@
 # - live streaming of model + command output
 # - repair loop fully visible
 # - controlled failure handling
+# - final command ready for copy/paste, optionally copied to clipboard
 #
 # USAGE:
 #   ./llm-run.sh "show disk usage"
 #   EXEC=1 ./llm-run.sh "show disk usage"   # allow execution
+#   COPY=1 ./llm-run.sh "show disk usage"   # copy command to clipboard (xclip)
 
 set -uo pipefail
 trap 'echo "[ERROR] contained failure (no shell exit)" >&2' ERR
@@ -23,6 +25,7 @@ SANDBOX_TIMEOUT=5
 REPAIR_ATTEMPTS=2
 
 EXEC="${EXEC:-0}"
+COPY="${COPY:-0}"
 
 CACHE="./.llm_cmd_cache.db"
 LOG="./.llm_cmd.log"
@@ -170,16 +173,27 @@ validate_execution() {
 }
 
 # -----------------------------
-# SIMULATE OUTPUT FOR DRY-RUN (v5.4)
+# SIMULATE OUTPUT FOR DRY-RUN
 # -----------------------------
 simulate_output() {
     case "$TASK" in
-        "show disk usage") df -h | head -n5 ;;       # limited preview
+        "show disk usage") df -h | head -n5 ;;
         "list running processes") ps aux | head -n5 ;;
         "list files sorted by newest") ls -t | head -n5 ;;
         "show current directory") pwd ;;
         *) echo "[SIMULATED OUTPUT]" ;;
     esac
+}
+
+# -----------------------------
+# COPY TO CLIPBOARD
+# -----------------------------
+copy_to_clipboard() {
+    local cmd="$1"
+    if [[ "$COPY" == "1" ]] && command -v xclip >/dev/null 2>&1; then
+        echo -n "$cmd" | xclip -sel clip
+        log "COPIED TO CLIPBOARD"
+    fi
 }
 
 # -----------------------------
@@ -191,6 +205,7 @@ log "TASK: $TASK"
 CMD=$(cache_get)
 if [[ -n "$CMD" ]]; then
     log "CACHE HIT: $CMD"
+    copy_to_clipboard "$CMD"
     if [[ "$EXEC" == "1" ]]; then
         OUTPUT=$(sandbox_exec "$CMD" || true)
         if validate_execution "$OUTPUT"; then
@@ -201,6 +216,7 @@ if [[ -n "$CMD" ]]; then
         echo "[DRY-RUN][CACHE] $CMD"
         echo "[DRY-RUN SIMULATED OUTPUT]"
         simulate_output
+        echo "Command ready for copy: $CMD"
         exit 0
     fi
 fi
@@ -211,12 +227,14 @@ if ! validate_command "$CMD"; then
     CMD=$(get_command "$FALLBACK_MODEL")
 fi
 log "MODEL CMD: $CMD"
+copy_to_clipboard "$CMD"
 
 # DRY RUN SIMULATION
 if [[ "$EXEC" != "1" ]]; then
     echo "[DRY-RUN][MODEL] $CMD"
     echo "[DRY-RUN SIMULATED OUTPUT]"
     simulate_output
+    echo "Command ready for copy: $CMD"
     exit 0
 fi
 
@@ -231,6 +249,7 @@ if ! validate_execution "$OUTPUT"; then
         OUTPUT=$(sandbox_exec "$CMD" || true)
         if validate_execution "$OUTPUT"; then
             log "REPAIR SUCCESS: $CMD"
+            copy_to_clipboard "$CMD"
             break
         fi
     done
@@ -241,6 +260,7 @@ if validate_execution "$OUTPUT"; then
     cache_put "$CMD"
     echo "$CMD"
     log "SUCCESS: $CMD"
+    echo "Command ready for copy: $CMD"
 else
     echo "FAILED"
     log "FAIL"
