@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# llm-run v6.4 (PRF-compliant, fully sanitized, debug, enhanced cache, sandbox, clipboard)
+# llm-run v6.5 (PRF-compliant, fully sanitized, debug, enhanced cache, sandbox, clipboard, resilient)
 # Author: PRF Audit Enabled
 # Purpose: Safely generate, validate, and optionally execute single-line bash commands via LLM
+# v6.5 Updates:
+# - Accepts minor LLM variations in commands
+# - Rotates fallback model during repair attempts
+# - Logs sandbox stderr separately for better debugging
 # [PRF-P00] Initialization & Config
 
 set -euo pipefail
@@ -100,21 +104,21 @@ get_command() {
 }
 
 # -----------------------------
-# [PRF-P10] Validate Command Against Task
+# [PRF-P10] Validate Command Against Task (accept minor variations)
 validate_command() {
     local cmd="$1"
     [[ -z "$cmd" ]] && return 1
     case "$TASK" in
-        "list files sorted by newest") [[ "$cmd" =~ ^ls ]] ;;
+        "list files sorted by newest") [[ "$cmd" =~ ^ls[[:space:]]?-t ]] ;;
         "show current directory") [[ "$cmd" =~ ^pwd$ ]] ;;
-        "list running processes") [[ "$cmd" =~ ^ps ]] ;;
-        "show disk usage") [[ "$cmd" =~ ^df ]] ;;
+        "list running processes") [[ "$cmd" =~ ^ps[[:space:]]+aux ]] ;;
+        "show disk usage") [[ "$cmd" =~ ^df[[:space:]]?-h ]] ;;
         *) return 1 ;;
     esac
 }
 
 # -----------------------------
-# [PRF-P11] Sandbox Execution
+# [PRF-P11] Sandbox Execution (stderr logged separately)
 sandbox_exec() {
     local cmd="$1"
     cmd=$(normalize_command "$cmd")
@@ -136,9 +140,9 @@ sandbox_exec() {
             --dev /dev \
             --tmpfs /tmp \
             --unshare-net \
-            /bin/sh -c "$cmd" 2>&1) || rc=$?
+            /bin/sh -c "$cmd" 2> >(tee -a "$LOG" >&2)) || rc=$?
     else
-        output=$(timeout "$SANDBOX_TIMEOUT" bash -c "$cmd" 2>&1) || rc=$?
+        output=$(timeout "$SANDBOX_TIMEOUT" bash -c "$cmd" 2> >(tee -a "$LOG" >&2)) || rc=$?
     fi
     printf '%s' "$output"
     return ${rc:-0}
@@ -200,6 +204,8 @@ if [[ -n "$CMD" ]]; then
     fi
 fi
 
+# -----------------------------
+# Fetch command from models
 CMD=$(get_command "$PRIMARY_MODEL")
 validate_command "$CMD" || CMD=$(get_command "$FALLBACK_MODEL")
 log "MODEL CMD: $CMD"
@@ -211,12 +217,19 @@ if [[ "$EXEC" != "1" ]]; then
     exit 0
 fi
 
+# -----------------------------
+# Execute and validate
 OUTPUT=$(sandbox_exec "$CMD")
 
 if ! validate_execution "$OUTPUT"; then
     for i in $(seq 1 $REPAIR_ATTEMPTS); do
         log "REPAIR ATTEMPT: $i"
-        CMD=$(get_command "$PRIMARY_MODEL")
+        # rotate fallback during repair
+        if (( i % 2 == 0 )); then
+            CMD=$(get_command "$FALLBACK_MODEL")
+        else
+            CMD=$(get_command "$PRIMARY_MODEL")
+        fi
         OUTPUT=$(sandbox_exec "$CMD")
         if validate_execution "$OUTPUT"; then
             log "REPAIR SUCCESS: $CMD"
