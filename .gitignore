@@ -1,0 +1,12 @@
+# runtime artifacts
+ollama_bench_*/
+*.log
+*.csv
+*.db
+
+# notes / scratch
+notes/
+
+# temp
+tmp/
+*.tmp
