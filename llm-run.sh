@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# llm-run v5.3 (OPERATOR-SAFE, LIVE STREAM)
+# llm-run v5.4 (OPERATOR-SAFE, LIVE STREAM, DRY-RUN SIMULATION)
 #
 # SAFE BY DEFAULT:
-# - DRY RUN (no execution unless EXEC=1)
+# - DRY RUN (simulated execution if EXEC=0)
 # - sandbox fully isolated
 # - cannot kill parent shell
 # - live streaming of model + command output
@@ -68,7 +68,7 @@ log() {
 }
 
 # -----------------------------
-# PROMPT
+# PROMPT / MODEL
 # -----------------------------
 build_prompt() {
     cat <<EOF
@@ -102,9 +102,6 @@ extract_command() {
     }'
 }
 
-# -----------------------------
-# MODEL CALL
-# -----------------------------
 call_model() {
     (
         set +e
@@ -120,9 +117,6 @@ get_command() {
     echo "$cmd"
 }
 
-# -----------------------------
-# VALIDATION
-# -----------------------------
 validate_command() {
     local cmd="$1"
     [[ -z "$cmd" ]] && return 1
@@ -140,12 +134,10 @@ validate_command() {
 # -----------------------------
 sandbox_exec() {
     local cmd="$1"
-
     if echo "$cmd" | grep -Eq '(rm -rf /|mkfs|dd if=|:(){|shutdown|reboot|poweroff|kill -9 1)'; then
         echo "BLOCKED"
         return 1
     fi
-
     (
         set +e
         if command -v bwrap >/dev/null 2>&1; then
@@ -178,6 +170,19 @@ validate_execution() {
 }
 
 # -----------------------------
+# SIMULATE OUTPUT FOR DRY-RUN (v5.4)
+# -----------------------------
+simulate_output() {
+    case "$TASK" in
+        "show disk usage") df -h | head -n5 ;;       # limited preview
+        "list running processes") ps aux | head -n5 ;;
+        "list files sorted by newest") ls -t | head -n5 ;;
+        "show current directory") pwd ;;
+        *) echo "[SIMULATED OUTPUT]" ;;
+    esac
+}
+
+# -----------------------------
 # MAIN FLOW
 # -----------------------------
 log "TASK: $TASK"
@@ -194,6 +199,8 @@ if [[ -n "$CMD" ]]; then
         fi
     else
         echo "[DRY-RUN][CACHE] $CMD"
+        echo "[DRY-RUN SIMULATED OUTPUT]"
+        simulate_output
         exit 0
     fi
 fi
@@ -205,9 +212,11 @@ if ! validate_command "$CMD"; then
 fi
 log "MODEL CMD: $CMD"
 
-# DRY RUN
+# DRY RUN SIMULATION
 if [[ "$EXEC" != "1" ]]; then
     echo "[DRY-RUN][MODEL] $CMD"
+    echo "[DRY-RUN SIMULATED OUTPUT]"
+    simulate_output
     exit 0
 fi
 
